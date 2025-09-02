@@ -1,29 +1,36 @@
-import { Plugin, registerPlugin } from 'enmity/managers/plugins';
+import { FormRow, FormText, FormSwitch, FormDivider } from 'enmity/components';
+import { SettingsStore } from 'enmity/api/settings';
 import { React } from 'enmity/metro/common';
-import { getByProps } from 'enmity/metro';
-import { create } from 'enmity/patcher';
-import manifest from '../manifest.json';
+import { useState } from 'react';
 
-import Settings from './components/Settings';
+interface SettingsProps {
+    settings: SettingsStore;
+}
 
-const Typing = getByProps('startTyping');
-const Patcher = create('silent-typing');
+export default ({ settings }: SettingsProps) => {
+    // Use a state hook to manage the text input value locally.
+    const [idInput, setIdInput] = useState(settings.get('targetId', ''));
 
-const SilentTyping: Plugin = {
-   ...manifest,
+    // Function to handle the ID being saved to the settings.
+    const handleSave = (newId: string) => {
+        // Save the new ID to the plugin's settings store.
+        // It will be read by the plugin's `onStart` method.
+        settings.set('targetId', newId);
+        setIdInput(newId);
+    };
 
-   onStart() {
-      Patcher.instead(Typing, 'startTyping', () => { });
-      Patcher.instead(Typing, 'stopTyping', () => { });
-   },
-
-   onStop() {
-      Patcher.unpatchAll();
-   },
-
-   getSettingsPanel({ settings }) {
-      return <Settings settings={settings} />;
-   }
+    return (
+        <FormRow
+            label="Target User ID"
+            subLabel="Enter the Discord ID of the user whose name you want to use."
+            trailing={
+                <FormText
+                    value={idInput}
+                    onChangeText={handleSave}
+                    placeholder="Enter User ID..."
+                    keyboardType="numeric"
+                />
+            }
+        />
+    );
 };
-
-registerPlugin(SilentTyping);
