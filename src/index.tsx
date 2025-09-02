@@ -1,36 +1,59 @@
-import { FormRow, FormText, FormSwitch, FormDivider } from 'enmity/components';
-import { SettingsStore } from 'enmity/api/settings';
+import { Plugin, registerPlugin } from 'enmity/managers/plugins';
 import { React } from 'enmity/metro/common';
-import { useState } from 'react';
+import { getByProps } from 'enmity/metro';
+import { create } from 'enmity/patcher';
+import manifest from '../manifest.json';
 
-interface SettingsProps {
-    settings: SettingsStore;
-}
+import Settings from './components/Settings';
 
-export default ({ settings }: SettingsProps) => {
-    // Use a state hook to manage the text input value locally.
-    const [idInput, setIdInput] = useState(settings.get('targetId', ''));
+// Get the UserStore, which contains functions to retrieve user information.
+const UserStore = getByProps('getCurrentUser');
 
-    // Function to handle the ID being saved to the settings.
-    const handleSave = (newId: string) => {
-        // Save the new ID to the plugin's settings store.
-        // It will be read by the plugin's `onStart` method.
-        settings.set('targetId', newId);
-        setIdInput(newId);
-    };
+// Create a patcher instance for this plugin.
+const Patcher = create('display-name-changer');
 
-    return (
-        <FormRow
-            label="Target User ID"
-            subLabel="Enter the Discord ID of the user whose name you want to use."
-            trailing={
-                <FormText
-                    value={idInput}
-                    onChangeText={handleSave}
-                    placeholder="Enter User ID..."
-                    keyboardType="numeric"
-                />
-            }
-        />
-    );
+const DisplayNameChanger: Plugin = {
+    ...manifest,
+
+    onStart() {
+        const { settings } = this;
+        const targetId = settings.get('targetId', null);
+
+        // Check if a target ID has been set in the plugin's settings.
+        if (targetId) {
+            // Patch the function that gets the current user's profile.
+            // This is a common way to modify how the current user's data is displayed.
+            Patcher.instead(UserStore, 'getCurrentUser', () => {
+                // Get the real current user.
+                const currentUser = Patcher.original(UserStore, 'getCurrentUser')();
+                // Get the target user from the UserStore using the ID from settings.
+                const targetUser = UserStore.getUser(targetId);
+
+                if (targetUser && currentUser) {
+                    // Create a new user object with the target user's display name,
+                    // but all other properties from the current user.
+                    // This is a simple way to change the name without affecting other data.
+                    return {
+                        ...currentUser,
+                        displayName: targetUser.username,
+                        username: targetUser.username // Update both for consistency
+                    };
+                }
+
+                // If no target user is found, return the original current user.
+                return currentUser;
+            });
+        }
+    },
+
+    onStop() {
+        // When the plugin is stopped, unpatch all changes to revert the display name.
+        Patcher.unpatchAll();
+    },
+
+    getSettingsPanel({ settings }) {
+        return <Settings settings={settings} />;
+    }
 };
+
+registerPlugin(DisplayNameChanger);

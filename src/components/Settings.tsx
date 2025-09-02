@@ -1,35 +1,48 @@
-import { FormRow, FormText, FormSwitch, FormDivider } from 'enmity/components';
+import { FormRow, FormText, FormSwitch, Modal, TextInput } from 'enmity/components';
 import { SettingsStore } from 'enmity/api/settings';
-import { React, useState } from 'enmity/metro/common';
+import { React } from 'enmity/metro/common';
+import { useState } from 'react';
 
 interface SettingsProps {
     settings: SettingsStore;
 }
 
 export default ({ settings }: SettingsProps) => {
-    // Use a state hook to manage the text input value locally.
+    // State to manage the visibility of the input modal.
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    // State to manage the text input value locally.
     const [idInput, setIdInput] = useState(settings.get('targetId', ''));
 
-    // Function to handle the ID being saved to the settings.
-    const handleSave = (newId: string) => {
+    // Function to handle saving the ID from the modal.
+    const handleSave = () => {
         // Save the new ID to the plugin's settings store.
-        // It will be read by the plugin's `onStart` method.
-        settings.set('targetId', newId);
-        setIdInput(newId);
+        settings.set('targetId', idInput);
+        setIsModalOpen(false);
     };
 
     return (
-        <FormRow
-            label="Target User ID"
-            subLabel="Enter the Discord ID of the user whose name you want to use."
-            trailing={
-                <FormText
+        <React.Fragment>
+            <FormRow
+                label="Target User ID"
+                subLabel="Tap to set the Discord ID of the user whose name you want to use."
+                onPress={() => setIsModalOpen(true)}
+                trailing={<FormText>{idInput || 'None'}</FormText>}
+            />
+            {/* The modal that will appear when the form row is tapped */}
+            <Modal
+                title="Enter Discord User ID"
+                isVisible={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSave={handleSave}
+                style="full"
+            >
+                <TextInput
                     value={idInput}
-                    onChangeText={handleSave}
+                    onChangeText={setIdInput}
                     placeholder="Enter User ID..."
                     keyboardType="numeric"
                 />
-            }
-        />
+            </Modal>
+        </React.Fragment>
     );
 };
